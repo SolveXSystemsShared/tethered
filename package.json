@@ -1,0 +1,23 @@
+{
+  "name": "scratch-2026-10-16-d7b7ce",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "docx": "^9.11.0",
+    "peerjs": "^1.5.5",
+    "playwright": "^1.64.1",
+    "qrcode-generator": "^1.5.2"
+  }
+}
