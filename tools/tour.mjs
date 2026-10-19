@@ -1,0 +1,36 @@
+// Screenshot tour of all screens at phone size.
+import { chromium } from 'playwright';
+const out = process.argv[2];
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+const p = await ctx.newPage();
+const shot = (n) => p.screenshot({ path: `${out}/t-${n}.png` });
+await p.goto('http://localhost:8080/?nosw&net=local');
+await p.waitForTimeout(1200); await shot('01-title');
+await p.click('text=Play on this device'); await p.waitForTimeout(300); await shot('02-mode');
+await p.click('[data-act=mode-survival]'); await p.waitForTimeout(1500); await shot('03-tutorial-move');
+// tutorial with a touch held on each side
+const cdp = await ctx.newCDPSession(p);
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 150, y: 260, id: 1 }, { x: 700, y: 260, id: 2 }] });
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 120, y: 220, id: 1 }, { x: 740, y: 230, id: 2 }] });
+await p.waitForTimeout(600); await shot('04-tutorial-sticks');
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+await p.click('#btn-skip'); await p.waitForTimeout(900); await shot('05-wave1-banner');
+await p.evaluate(() => { const g = window.__tethered.game; g.wave = 2; g.enemies.length = 0; g.portals.length = 0; g.spawner.steps = []; g.spawner.groups = []; });
+await p.waitForTimeout(4400); await shot('06-wave3-intro-card');
+await p.waitForTimeout(3000); await shot('07-dasher');
+await p.click('#btn-pause'); await p.waitForTimeout(300); await shot('08-pause');
+await p.click('[data-act=resume]'); await p.waitForTimeout(600); await shot('09-countdown');
+await p.evaluate(() => { const g = window.__tethered.game; g.lives = 99; g.wave = 9; g.enemies.length = 0; g.portals.length = 0; g.spawner.steps = []; g.spawner.groups = []; });
+await p.waitForTimeout(9000); await shot('10-boss');
+await p.evaluate(() => { const g = window.__tethered.game; g.spawnCapsule('nova'); });
+await p.waitForTimeout(500); await shot('11-capsule');
+await p.evaluate(() => { const g = window.__tethered.game; g.lives = 1; g.players[0].inv = 0; g.hurtPlayer(0, 'x'); });
+await p.waitForTimeout(2200); await shot('12-gameover');
+await p.goto('http://localhost:8080/?nosw&net=local'); await p.waitForTimeout(500);
+await p.click('text=Play on two phones'); await p.waitForTimeout(300); await shot('13-online');
+await p.click('text=Host a game'); await p.waitForTimeout(1500); await shot('14-host');
+await p.goto('http://localhost:8080/?nosw&net=local'); await p.waitForTimeout(500);
+await p.click('text=Play on two phones'); await p.click('text=Join a game'); await p.fill('#join-code', 'ab2cd'); await p.waitForTimeout(300); await shot('15-join');
+await p.goto('http://localhost:8080/?nosw'); await p.waitForTimeout(400); await p.click('text=Settings'); await p.waitForTimeout(300); await shot('16-settings');
+await b.close();

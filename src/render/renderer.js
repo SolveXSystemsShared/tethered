@@ -11,6 +11,7 @@ export const COLORS = {
   tele: '#F0E442', gem: '#2EE6A8', heart: '#ffffff', shot: '#FF6FB5', white: '#ffffff',
   freeze: '#9fd8ff',
 };
+const BG_PAD = 32; // px of background beyond the screen edge (room for screen shake)
 const FONT = "ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif";
 
 const INTRO_HINT = {
@@ -80,6 +81,7 @@ export class Renderer {
   }
 
   drawGlow(ctx, x, y, r, color, alpha = 1) {
+    if (this.dbg?.noglow) return;
     ctx.globalAlpha = alpha;
     ctx.drawImage(this.glowSprite(color), x - r, y - r, r * 2, r * 2);
     ctx.globalAlpha = 1;
@@ -184,57 +186,59 @@ export class Renderer {
     this.scale = s;
     const ox = (this.cw - w * s) / 2, oy = (this.ch - h * s) / 2;
     const dpr = this.dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#05070f';
-    ctx.fillRect(0, 0, this.cw, this.ch);
-
     const [sx, sy, sr] = this.shake.offset(cfg.fx.shakeMax, cfg.fx.shakeFreq);
+    const D = this.dbg || {};
+    // background: pre-rendered at device resolution and blitted 1:1 (scaled blits are slow)
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (!D.nobg) {
+      const bg = this.background(view, s, ox, oy);
+      ctx.drawImage(bg, Math.round(sx * s * dpr) - BG_PAD, Math.round(sy * s * dpr) - BG_PAD);
+    } else { ctx.fillStyle = '#05070f'; ctx.fillRect(0, 0, this.c.width, this.c.height); }
     ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * (ox + sx * s), dpr * (oy + sy * s));
     if (sr) { ctx.translate(w / 2, h / 2); ctx.rotate(sr); ctx.translate(-w / 2, -h / 2); }
 
-    this.drawArena(ctx, view);
     if (view.tut) this.drawTutorialWorld(ctx, view);
     this.drawPortals(ctx, view);
     this.drawCapsules(ctx, view);
     this.drawGems(ctx, view);
     this.drawTelegraphs(ctx, view);
     if (view.boss) this.drawBoss(ctx, view);
-    this.drawEnemies(ctx, view);
-    this.drawRope(ctx, view);
+    if (!D.noenemies) this.drawEnemies(ctx, view);
+    if (!D.norope) this.drawRope(ctx, view);
     this.drawPlayers(ctx, view);
     this.drawShots(ctx, view);
-    this.particles.draw(ctx);
-    this.floaters.draw(ctx, FONT);
+    if (!D.noparticles) this.particles.draw(ctx);
+    if (!D.nofloat) this.floaters.draw(ctx, FONT);
     if (view.power.freeze > 0) { ctx.fillStyle = 'rgba(120,190,255,0.07)'; ctx.fillRect(0, 0, w, h); }
 
     // screen space
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (this.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(0.35, this.flash * 2)})`; ctx.fillRect(0, 0, this.cw, this.ch); }
     if (input && !opts.hideSticks) this.drawSticks(ctx, input, view);
-    this.drawHUD(ctx, view, opts);
-    this.drawBanner(ctx, view);
+    if (opts.attract) { ctx.fillStyle = 'rgba(5,7,15,0.35)'; ctx.fillRect(0, 0, this.cw, this.ch); return; }
+    if (!D.nohud) this.drawHUD(ctx, view, opts);
+    if (!D.nohud) this.drawBanner(ctx, view);
   }
 
-  drawArena(ctx, view) {
-    const { w, h } = view.cfg.arena;
-    if (!this.bgCache) {
-      const cv = document.createElement('canvas');
-      const sc = Math.min(1, this.scale * this.dpr);
-      cv.width = Math.ceil(w * sc); cv.height = Math.ceil(h * sc);
-      const g = cv.getContext('2d');
-      g.scale(sc, sc);
-      const gr = g.createRadialGradient(w / 2, h / 2, 100, w / 2, h / 2, w * 0.7);
-      gr.addColorStop(0, '#11163a'); gr.addColorStop(1, COLORS.bg);
-      g.fillStyle = gr; g.fillRect(0, 0, w, h);
-      g.strokeStyle = COLORS.grid; g.lineWidth = 2;
-      g.beginPath();
-      for (let x = 0; x <= w; x += 80) { g.moveTo(x, 0); g.lineTo(x, h); }
-      for (let y = 0; y <= h; y += 80) { g.moveTo(0, y); g.lineTo(w, y); }
-      g.stroke();
-      g.strokeStyle = COLORS.edge; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
-      this.bgCache = cv;
-    }
-    ctx.drawImage(this.bgCache, 0, 0, w, h);
+  background(view, s, ox, oy) {
+    const W = this.c.width + BG_PAD * 2, H = this.c.height + BG_PAD * 2;
+    if (this.bgCache && this.bgCache.width === W && this.bgCache.height === H) return this.bgCache;
+    const { w, h } = view.cfg.arena, dpr = this.dpr;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d', { alpha: false });
+    g.fillStyle = '#05070f'; g.fillRect(0, 0, W, H);
+    g.setTransform(dpr * s, 0, 0, dpr * s, BG_PAD + dpr * ox, BG_PAD + dpr * oy);
+    const gr = g.createRadialGradient(w / 2, h / 2, 100, w / 2, h / 2, w * 0.7);
+    gr.addColorStop(0, '#11163a'); gr.addColorStop(1, COLORS.bg);
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.strokeStyle = COLORS.grid; g.lineWidth = 2;
+    g.beginPath();
+    for (let x = 0; x <= w; x += 75) { g.moveTo(x, 0); g.lineTo(x, h); }
+    for (let y = 0; y <= h; y += 75) { g.moveTo(0, y); g.lineTo(w, y); }
+    g.stroke();
+    g.strokeStyle = COLORS.edge; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
+    return (this.bgCache = cv);
   }
 
   pop(id) {
@@ -715,7 +719,7 @@ export class Renderer {
       const a = Math.min(1, b.t * 3, t * 8);
       const sc = t < 0.1 ? 1.3 - t * 3 : 1;
       ctx.globalAlpha = a;
-      const y = this.ch * (b.small ? 0.3 : 0.38);
+      const y = this.ch * (b.small ? 0.22 : 0.38);
       this.label(ctx, this.cw / 2, y, b.title, b.color, Math.round((b.small ? 34 : 48) * k * sc));
       if (b.sub) this.label(ctx, this.cw / 2, y + 40 * k, b.sub, '#dfe4ff', Math.round(20 * k));
       ctx.globalAlpha = 1;

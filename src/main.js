@@ -1,7 +1,7 @@
 // App controller: screens, game loop, roles (local / host / guest), online flow.
 import { cloneConfig } from './config.js';
 import { createGame, stepGame, skipTutorial, gameStats } from './sim/game.js';
-import { Bot } from './sim/bots.js';
+import { Bot, pairBots } from './sim/bots.js';
 import { encodeSnapshot, Interpolator } from './sim/snapshot.js';
 import { Renderer } from './render/renderer.js';
 import { Input } from './input.js';
@@ -170,7 +170,8 @@ function startLocal(mode, opts = {}) {
   const tutorial = opts.tutorial ?? !save.progress().tutorialDone;
   newGame(mode, { ...opts, tutorial: opts.checkpoint ? false : tutorial });
   const b1 = params.get('bots') || app.demo, b2 = params.get('bot2') || b1;
-  app.bots = [b1 ? new Bot(app.game, 0, b1, 7) : null, b2 ? new Bot(app.game, 1, b2, 7) : null];
+  app.bots = [b1 ? new Bot(app.game, 0, b1, 7) : null, b2 ? new Bot(app.game, 1, b2, 8) : null];
+  if (app.bots[0] && app.bots[1]) pairBots(app.bots[0], app.bots[1]);
 }
 
 function restart(opts = {}) {
@@ -611,7 +612,7 @@ function showCountdown() {
 function runAttract(dt) {
   if (!app.attract || app.attract.over) {
     app.attract = createGame(cfg, { mode: 'endless', seed: (Math.random() * 1e9) | 0 });
-    app.attractBots = [new Bot(app.attract, 0, 'strong', 3), new Bot(app.attract, 1, 'strong', 3)];
+    app.attractBots = pairBots(new Bot(app.attract, 0, 'strong', 3), new Bot(app.attract, 1, 'strong', 4));
   }
   const g = app.attract;
   app.acc += dt;
@@ -624,7 +625,7 @@ function runAttract(dt) {
   }
   if (n === 3) app.acc = 0;
   renderer.banner = null; renderer.introCard = null;
-  renderer.draw(g, null, dt, { hideSticks: true });
+  renderer.draw(g, null, dt, { hideSticks: true, attract: true });
 }
 
 function trackFps(dt) {

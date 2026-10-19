@@ -1,0 +1,23 @@
+// Screenshots of an online session from both sides (local transport).
+import { chromium } from 'playwright';
+const out = process.argv[2];
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+const host = await ctx.newPage(), guest = await ctx.newPage();
+await host.goto('http://localhost:8080/?nosw&net=local');
+await host.evaluate(() => localStorage.setItem('tethered.save.v1', JSON.stringify({ progress: { tutorialDone: true } })));
+await host.click('text=Play on two phones'); await host.click('text=Host a game');
+await host.waitForFunction(() => /^[A-Z0-9]{5}$/.test(document.getElementById('room-code').textContent));
+await guest.goto((await host.inputValue('#room-link')).replace('?', '?nosw&'));
+await guest.waitForTimeout(1500);
+await guest.screenshot({ path: `${out}/o-1-guest-wait.png` });
+await host.screenshot({ path: `${out}/o-2-host-mode.png` });
+await host.click('[data-act=mode-survival]');
+await guest.waitForTimeout(3000);
+const cdp = await ctx.newCDPSession(guest);
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 600, y: 250, id: 1 }] });
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 650, y: 220, id: 1 }] });
+await guest.waitForTimeout(700);
+await guest.screenshot({ path: `${out}/o-3-guest-game.png` });
+await host.screenshot({ path: `${out}/o-4-host-game.png` });
+await b.close();

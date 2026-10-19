@@ -73,7 +73,18 @@ export function updateTutorial(g, dt) {
       break;
     }
     case 'sweep':
-      if (tut.flags.kills > 0) { tut.flags.gem = false; go(g, 'gem'); if (g.gems.length === 0) g.spawnGem(w / 2, h / 2, 'shard'); }
+      if (tut.flags.kills > 0) {
+        tut.flags.gem = false; go(g, 'gem');
+        // place the gem a short trip away from both orbs so grabbing it is a deliberate move
+        g.gems.length = 0;
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        g.spawnGem(mx < w / 2 ? mx + 300 : mx - 300, my < h / 2 ? my + 140 : my - 140, 'prism');
+      }
+      else if (!g.enemies.some((e) => e.id === tut.enemyId)) {
+        // safety net: the target vanished without a rope cut -> bring a new one
+        const e = g.addEnemy('drifter', w / 2, h / 2);
+        e.tut = true; e.sleepy = true; tut.enemyId = e.id;
+      }
       break;
     case 'gem':
       if (tut.flags.gem) {

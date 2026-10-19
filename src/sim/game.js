@@ -1,6 +1,6 @@
 // Core simulation: players, rope, cutting, scoring, pickups, wave flow.
 // Pure logic — no DOM — so it runs identically in the browser and in Node (bots).
-import { makeRng, clamp, len, dist, dist2, segDist } from './math.js';
+import { makeRng, clamp, len, dist, dist2, segDistT, segT } from './math.js';
 import { makeEnemy, updateEnemy, makeBoss, updateBoss, damageBoss, bossNodesAlive } from './enemies.js';
 import { Spawner, genEndlessWave, survivalSteps, SURVIVAL_COUNT } from './waves.js';
 import { SURVIVAL_WAVES } from '../config.js';
@@ -302,16 +302,24 @@ function updateRopeSamples(g, init, dt = 1 / 60) {
   }
 }
 
-// distance from point to rope polyline -> [d, tGlobal, speed]
+// distance from point to the rope polyline. Results land in RQ (reused, allocation-free):
+// RQ.d distance, RQ.t position along the rope (0 = P1 end, 1 = P2 end), RQ.speed rope speed there.
+export const RQ = { d: 0, t: 0, speed: 0, nx: 0, ny: -1 };
 export function ropeQuery(g, x, y) {
   const R = g.rope, S = g.cfg.rope.samples, P = R.pts;
   let best = 1e9, bt = 0, bk = 0;
   for (let k = 0; k < S; k++) {
-    const [d, t] = segDist(x, y, P[k * 2], P[k * 2 + 1], P[k * 2 + 2], P[k * 2 + 3]);
-    if (d < best) { best = d; bt = t; bk = k; }
+    const d = segDistT(x, y, P[k * 2], P[k * 2 + 1], P[k * 2 + 2], P[k * 2 + 3]);
+    if (d < best) { best = d; bt = segT.t; bk = k; }
   }
-  const speed = R.spd[bk] * (1 - bt) + R.spd[bk + 1] * bt;
-  return [best, (bk + bt) / S, speed];
+  RQ.d = best; RQ.t = (bk + bt) / S; RQ.speed = R.spd[bk] * (1 - bt) + R.spd[bk + 1] * bt;
+  // outward normal from the closest rope point toward (x, y)
+  const ax = P[bk * 2], ay = P[bk * 2 + 1], bx = P[bk * 2 + 2], by = P[bk * 2 + 3];
+  const px = ax + (bx - ax) * bt, py = ay + (by - ay) * bt;
+  let dx = x - px, dy = y - py, l = Math.sqrt(dx * dx + dy * dy);
+  if (l < 0.001) { dx = -(by - ay); dy = bx - ax; l = Math.sqrt(dx * dx + dy * dy) || 1; }
+  RQ.nx = dx / l; RQ.ny = dy / l;
+  return RQ;
 }
 
 function ropeCuts(g, dt) {
@@ -319,36 +327,20 @@ function ropeCuts(g, dt) {
   for (let i = g.enemies.length - 1; i >= 0; i--) {
     const e = g.enemies[i];
     if (e.born < 0.12 && e.type !== 'node') continue; // brief spawn grace
-    const [d, t, speed] = ropeQuery(g, e.x, e.y);
+    const q = ropeQuery(g, e.x, e.y);
+    const d = q.d, t = q.t, speed = q.speed;
     if (d > e.r + R.width) continue;
     const c = cfg.enemies[e.type];
     if (c.cutSpeed && !mega && speed < c.cutSpeed && e.armor > 0) {
       // armour: a slow rope bounces off and knocks a plate loose; fast swings cut straight through
-      const n = ropeNormal(g, e.x, e.y);
-      e.kx = n[0] * c.bounce; e.ky = n[1] * c.bounce;
-      e.x += n[0] * (e.r + R.width - d + 1); e.y += n[1] * (e.r + R.width - d + 1);
+      const nx = q.nx, ny = q.ny;
+      e.kx = nx * c.bounce; e.ky = ny * c.bounce;
+      e.x += nx * (e.r + R.width - d + 1); e.y += ny * (e.r + R.width - d + 1);
       if (e.clank <= 0) { e.clank = 0.35; e.flash = 0.12; e.armor--; g.events.push({ k: 'clank', x: e.x, y: e.y, armor: e.armor }); }
       continue;
     }
     killEnemy(g, i, creditFor(g, t), 'rope');
   }
-}
-
-function ropeNormal(g, x, y) {
-  const R = g.rope, S = g.cfg.rope.samples, P = R.pts;
-  let best = 1e9, nx = 0, ny = -1;
-  for (let k = 0; k < S; k++) {
-    const ax = P[k * 2], ay = P[k * 2 + 1], bx = P[k * 2 + 2], by = P[k * 2 + 3];
-    const [d, t] = segDist(x, y, ax, ay, bx, by);
-    if (d < best) {
-      best = d;
-      const px = ax + (bx - ax) * t, py = ay + (by - ay) * t;
-      let dx = x - px, dy = y - py, l = len(dx, dy);
-      if (l < 0.001) { dx = -(by - ay); dy = bx - ax; l = len(dx, dy) || 1; }
-      nx = dx / l; ny = dy / l;
-    }
-  }
-  return [nx, ny];
 }
 
 function creditFor(g, t) {
@@ -394,8 +386,8 @@ function bossCore(g, dt) {
   const b = g.boss, cfg = g.cfg, R = g.rope;
   if (b.open <= 0) return;
   const taut = R.len >= R.maxLen * cfg.rope.tautRatio;
-  const [d, , speed] = ropeQuery(g, b.x, b.y);
-  if (!taut || d > b.r * 0.9 || speed < 20) return;
+  const q = ropeQuery(g, b.x, b.y);
+  if (!taut || q.d > b.r * 0.9 || q.speed < 20) return;
   const amt = cfg.boss.coreDps * dt;
   if (damageBoss(g, amt)) {
     // boss defeated: everything on screen pops
@@ -451,6 +443,7 @@ function playerContacts(g) {
       const e = g.enemies[j];
       if (e.born < g.cfg.enemies.hurtGrace) continue; // just spawned / just split: harmless for a moment
       if (e.type === 'node') continue;                  // boss shield nodes are armour, not weapons
+      if (e.sleepy) continue;                           // tutorial practice target: only the rope can pop it
       if (dist2(p.x, p.y, e.x, e.y) < (hr + e.r * 0.85) ** 2) {
         if (hurtPlayer(g, i, e.type)) {
           if (e.type !== 'node') {
@@ -489,8 +482,7 @@ function updateShots(g, edt, dt) {
     if (s.dead) continue;
     s.x += s.vx * edt; s.y += s.vy * edt; s.t -= edt;
     if (s.t <= 0 || s.x < -20 || s.x > w + 20 || s.y < -20 || s.y > h + 20) { s.dead = true; continue; }
-    const [d] = ropeQuery(g, s.x, s.y);
-    if (d < s.r + R.width) { s.dead = true; g.score += 2; g.events.push({ k: 'block', x: s.x, y: s.y }); continue; }
+    if (ropeQuery(g, s.x, s.y).d < s.r + R.width) { s.dead = true; g.score += 2; g.events.push({ k: 'block', x: s.x, y: s.y }); continue; }
     for (let p = 0; p < 2; p++) {
       const pl = g.players[p];
       if (pl.inv <= 0 && dist2(pl.x, pl.y, s.x, s.y) < (hr + s.r) ** 2) {

@@ -23,14 +23,22 @@ export const len = (x, y) => Math.sqrt(x * x + y * y);
 export const dist = (ax, ay, bx, by) => Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2);
 export const dist2 = (ax, ay, bx, by) => (ax - bx) ** 2 + (ay - by) ** 2;
 
-// Closest point on segment AB to P. Returns [distance, t].
-export function segDist(px, py, ax, ay, bx, by) {
+// Closest point on segment AB to P. Returns the distance; the segment parameter t
+// is left in segT.t (no allocation: this runs thousands of times per frame).
+export const segT = { t: 0 };
+export function segDistT(px, py, ax, ay, bx, by) {
   const dx = bx - ax, dy = by - ay;
   const l2 = dx * dx + dy * dy;
   let t = l2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / l2 : 0;
-  t = clamp(t, 0, 1);
-  const cx = ax + dx * t, cy = ay + dy * t;
-  return [Math.sqrt((px - cx) ** 2 + (py - cy) ** 2), t];
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  segT.t = t;
+  const cx = ax + dx * t - px, cy = ay + dy * t - py;
+  return Math.sqrt(cx * cx + cy * cy);
+}
+// Convenience form: [distance, t]
+export function segDist(px, py, ax, ay, bx, by) {
+  const d = segDistT(px, py, ax, ay, bx, by);
+  return [d, segT.t];
 }
 
 // Turn angle a toward b by at most maxStep radians.
