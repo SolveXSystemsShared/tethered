@@ -5,16 +5,16 @@ Resumable log of the build. If the session is interrupted, read this first and c
 ## Phases
 - [x] 1. Research (4 parallel subagents) → `docs/research-summary.md`
 - [x] 2. Plan → `docs/DESIGN.md`, all tuning in `src/config.js`
-- [~] 3. Build game + bots + simulation + tuning → `tools/sim.mjs`, `docs/sim-results.md`
+- [x] 3. Build game + bots + simulation + tuning → `tools/sim.mjs`, `docs/sim-results.md`
   - [x] sim core, enemies, boss, waves, tutorial, scoring
   - [x] renderer, input, audio, net (PeerJS + BroadcastChannel), UI, PWA
   - [x] bots (planner, 3 human-model profiles) + parallel sim harness
   - [x] tuning v1 meets all targets (sim-out/sim-v1.txt)
-  - [ ] browser verification of all flows, perf check, size check
-- [ ] 4. Independent Playwright review + fixes + re-simulation
-- [ ] 5. Deploy (GitHub Pages)
-- [ ] 6. Word documents (player guide, design doc, pitch) → `deliverables/`
-- [ ] 7. Delivery summary
+  - [x] browser verification of all flows (tests/e2e.mjs, 15 tests), perf check (60fps @4x CPU), size check (~0.37MB)
+- [x] 4. Independent Playwright review + fixes + re-simulation (24 issues, all addressed: docs/review.json; sim v2)
+- [x] 5. Deploy (GitHub Pages): https://solvexsystemsshared.github.io/tethered/ (repo SolveXSystemsShared/tethered)
+- [x] 6. Word documents (player guide, design doc, pitch) → `deliverables/` (built by tools/make-docs.mjs)
+- [x] 7. Delivery summary
 
 ## Decisions & assumptions
 - Static ES-module web app, no build step. Vendored libs: PeerJS 1.5.5 (`vendor/peerjs.min.js`, 87KB) and qrcode-generator (`vendor/qrcode.min.js`, 20KB) so the app works without third-party CDNs and same-device mode works offline.
@@ -27,3 +27,6 @@ Resumable log of the build. If the session is interrupted, read this first and c
 - Bot redesign: short-horizon planner (scores candidate stick directions by predicted danger, rope sweeps, goals). Bot skill profiles fixed as human models BEFORE game tuning (weak ~325ms reaction, average ~225ms, strong ~150ms).
 - Design changes driven by simulation: newborn enemies harmless for 0.45s; boss shield nodes don't hurt on touch; boss beam slower (0.7 rad/s, 64deg arc); boss holds attacks while core is open; flat core damage while taut rope crosses it; spitters are slow 'turrets' (hold fire when an orb is within 200); brutes have 2 armour plates (slow hit = lose a plate, fast hit = kill); survival hearts after waves 3,5-9.
 - Tuning v1 (200 runs/skill/mode): Survival weak reach>=4 70%, average clear 40%, strong clear 95% (3* 5.5%). Endless weak >=3 waves 98%, average median 5:32, strong median 10:21, >15min 0%.
+- Review fixes: audio null-guard + resilient event loop; host-left detection (goodbye on pagehide + broker notfound); hit-based stars (2* <=4 hits, 3* flawless under 7:05); post-boss breather in Endless; Skip moved to top bar; tutorial capsule step; spitter turret shape; high-contrast shots; HUD hidden under dialogs; Esc/P pause; How-to-play end screen; drop-screen wording; snapshots 25Hz / 120ms interp.
+- Final sim (v2, 200 runs each): Survival weak reach>=4 69%, avg clear 35%, strong clear 99% (3* 8%); Endless weak >=3 waves 96%, avg median 5:28, strong median 10:22, >15min 0%.
+- Deployed v1.1.0; full e2e suite (incl. real PeerJS) passes against the live URL.
