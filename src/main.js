@@ -10,7 +10,7 @@ import * as save from './save.js';
 import * as plat from './platform.js';
 import * as ui from './ui.js';
 import { $ } from './ui.js';
-import { HostSession, GuestSession, makeTransport, roomUrl, normaliseCode } from './net.js';
+import { HostSession, GuestSession, makeTransport, roomUrl, normaliseCode, loadScript } from './net.js';
 
 const params = new URLSearchParams(location.search);
 const LOCAL_NET = params.get('net') === 'local';
@@ -46,6 +46,7 @@ $('set-assist').addEventListener('change', (e) => { save.setSetting('assist', e.
 function refreshBests() {
   const b = save.best();
   const sv = b.survival, en = b.endless;
+  $('survival-rules').textContent = `★ clear · ★★ ${cfg.stars.twoHits} hits or fewer · ★★★ no hits, under ${fmtClock(cfg.stars.threeTime)}`;
   $('best-survival').textContent = sv.cleared ? `${'★'.repeat(sv.stars)}${'☆'.repeat(3 - sv.stars)}  best ${sv.score}` : sv.bestWave ? `Best: wave ${sv.bestWave}` : '';
   $('best-endless').textContent = en.score ? `Best ${en.score} · wave ${en.wave}` : '';
   const parts = [];
@@ -53,6 +54,8 @@ function refreshBests() {
   if (en.score) parts.push(`Endless best ${en.score} (wave ${en.wave})`);
   $('title-best').textContent = parts.join('   ·   ');
 }
+
+const fmtClock = (t) => `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, '0')}`;
 
 // ---------------- navigation ----------------
 function goTitle() {
@@ -83,13 +86,15 @@ ui.bindActions((act) => {
   switch (act) {
     case 'local': app.role = 'local'; showModeSelect(false); break;
     case 'online': ui.show('online'); break;
-    case 'howto': startLocal('survival', { tutorial: true }); break;
-    case 'settings': applySettings(); ui.show('settings'); break;
+    case 'howto': startLocal('survival', { tutorial: true, howto: true }); break;
+    case 'settings': app.settingsFrom = ui.screen(); applySettings(); ui.show('settings'); break;
+    case 'tut-play': app.paused = false; app.pauseReason = null; ui.hideAll(); app.countdown = 1.5; break;
     case 'mute': save.setSetting('muted', !save.settings().muted); applySettings(); break;
     case 'fullscreen': plat.toggleFullscreen(); break;
     case 'back': {
       const s = ui.screen();
-      if (s === 'mode' && app.role === 'host') leaveOnline();
+      if (s === 'settings' && app.settingsFrom === 'pause') ui.show('pause');
+      else if (s === 'mode' && app.role === 'host') leaveOnline();
       else if (s === 'join') ui.show('online');
       else goTitle();
       break;
@@ -114,7 +119,7 @@ ui.bindActions((act) => {
       if (app.role === 'guest') app.session?.send({ t: 'req', a: 'skip' });
       else if (app.game) { skipTutorial(app.game); save.setProgress('tutorialDone', true); }
       break;
-    case 'waitmore': app.dropDeadline = performance.now() / 1000 + cfg.net.rejoinWindow; $('drop-buttons').hidden = true; break;
+    case 'waitmore': app.dropDeadline = performance.now() / 1000 + cfg.net.rejoinWindow; $('btn-waitmore').hidden = true; break;
     case 'msg-ok': if (app.msgAfter === 'join') ui.show('join'); else goTitle(); break;
   }
 });
@@ -239,7 +244,7 @@ function showEnd(stats) {
   const b = save.best();
   Object.assign(info, {
     bestScore: stats.mode === 'survival' ? b.survival.score : b.endless.score,
-    bestWave: b.endless.wave, twoLives: cfg.stars.twoLives, threeLives: cfg.stars.threeLives, threeScore: cfg.stars.threeScore,
+    bestWave: b.endless.wave, twoHits: cfg.stars.twoHits, threeTime: fmtClock(cfg.stars.threeTime),
   });
   ui.fillEnd(stats, info);
   const guest = app.role === 'guest';
@@ -249,14 +254,18 @@ function showEnd(stats) {
   $('end-wait').hidden = !guest;
   $('hud-btns').hidden = true;
   ui.show('end');
-  if (stats.won) audio.sfx.win(); else audio.sfx.over();
+  try { if (stats.won) audio.sfx.win(); else audio.sfx.over(); } catch { /* audio is optional */ }
   audio.stopMusic();
   if (app.role === 'local') plat.keepAwake(false);
   if (app.role === 'host') { app.lastEnd = stats; app.session?.send({ t: 'end', stats }); }
 }
 
 // ---------------- events -> audio / haptics / fx ----------------
+// A cosmetic failure (audio, effects) must never stop the simulation or rendering.
 function handleEvent(ev, view) {
+  try { handleEventInner(ev, view); } catch (e) { if (!handleEvent.warned) { handleEvent.warned = true; console.warn('effect error', e); } }
+}
+function handleEventInner(ev, view) {
   renderer.onEvent(ev, view);
   const S = audio.sfx;
   switch (ev.k) {
@@ -287,7 +296,10 @@ function handleEvent(ev, view) {
     case 'coreOpen': S.coreOpen(); break;
     case 'beam': S.beam(); break;
     case 'ring': S.ring(); break;
-    case 'tutDone': save.setProgress('tutorialDone', true); break;
+    case 'tutDone':
+      save.setProgress('tutorialDone', true);
+      if (app.role === 'local' && app.opts?.howto) { app.paused = true; app.pauseReason = 'tutdone'; ui.show('tutdone'); }
+      break;
   }
 }
 
@@ -301,6 +313,7 @@ function startHost() {
   app.role = 'host';
   const s = new HostSession(makeTransport());
   app.session = s;
+  loadScript('vendor/qrcode.min.js').catch(() => {}); // fetch the QR library while the room opens
   ui.setText('host-status', 'Starting…'); $('host-status').classList.remove('err');
   ui.setText('room-code', '·····'); $('room-link').value = ''; $('qr').innerHTML = '';
   $('btn-share').hidden = !navigator.share;
@@ -310,6 +323,7 @@ function startHost() {
     ui.setText('room-code', code);
     const url = roomUrl(code);
     $('room-link').value = url;
+    requestAnimationFrame(() => { $('room-link').scrollLeft = 1e4; });
     ui.renderQR($('qr'), url);
     ui.setText('host-status', 'Waiting for your partner…');
   });
@@ -364,7 +378,7 @@ function startHost() {
       else if (m.a === 'hidden') { if (app.running && !app.paused && !app.game?.over) setPaused(true, 'partner-hidden'); }
       else if (m.a === 'resume') setPaused(false);
       else if (m.a === 'skip' && app.game) { skipTutorial(app.game); }
-      else if (m.a === 'leave') { s.dropped(); }
+      else if (m.a === 'leave' || m.a === 'gone') { s.dropped(); }
     }
   });
   s.start();
@@ -386,7 +400,7 @@ function hostStart(mode, opts = {}) {
 function showDrop(title, sub) {
   ui.setText('drop-title', title); ui.setText('drop-sub', sub);
   app.dropDeadline = performance.now() / 1000 + cfg.net.rejoinWindow;
-  $('drop-buttons').hidden = true;
+  $('btn-waitmore').hidden = true;
   ui.show('drop');
 }
 
@@ -409,6 +423,7 @@ function startGuest(code, token) {
     audio.sfx.ring(); plat.buzz(30);
   });
   s.on('rejoin', () => {
+    app.notFound = 0;
     save.sessionSet('guest', { code, token: s.token, ts: Date.now() });
     ui.toast('Reconnected!');
     if (ui.screen() === 'drop') ui.show(app.running ? null : 'wait');
@@ -427,6 +442,14 @@ function startGuest(code, token) {
   });
   s.on('drop', () => {
     showDrop('Connection lost', 'Reconnecting…');
+  });
+  app.notFound = 0;
+  s.on('retryfail', (kind) => {
+    // the broker says the room no longer exists: the host closed or reloaded the game
+    if (kind === 'notfound' && ++app.notFound >= 2) {
+      stopGame(); leaveOnline(true);
+      message('The host left the game', 'The host closed or reloaded the game, so this room has ended. Ask them to host a new game.');
+    }
   });
   s.on('unstable', (on) => { app.unstable = on; });
   s.on('msg', (m) => guestMsg(m));
@@ -475,7 +498,7 @@ function guestMsg(m) {
     case 'bye':
       stopGame();
       app.session?.close(); app.session = null; save.sessionDel('guest');
-      message('Game ended', 'The host closed the game.');
+      message('The host left the game', 'The host closed or reloaded the game, so this room has ended. Ask them to host a new game.');
       break;
   }
 }
@@ -502,6 +525,16 @@ window.addEventListener('popstate', () => {
   if (app.running && !app.paused && app.role !== 'guest') { setPaused(true, 'user'); try { history.pushState({ g: 1 }, ''); } catch { /* */ } }
 });
 window.addEventListener('resize', () => { renderer.resize(); });
+// tell the other phone straight away when this page goes away (closing / reloading)
+window.addEventListener('pagehide', () => {
+  if (!app.session) return;
+  if (app.role === 'host') app.session.send({ t: 'bye' });
+  else if (app.role === 'guest') app.session.send({ t: 'req', a: 'gone' });
+});
+window.addEventListener('keydown', (e) => {
+  if (!app.running || (e.key !== 'Escape' && e.key.toLowerCase() !== 'p') || e.target.tagName === 'INPUT') return;
+  if (ui.screen() === 'pause') requestResume(); else if (!ui.screen()) requestPause();
+});
 
 function checkRotate() {
   const portrait = plat.isPortrait() && app.running && !app.endShown;
@@ -563,7 +596,9 @@ function frame(nowMs) {
     if (g.enemies) audio.setMusicIntensity(Math.min(1, g.enemies.length / 18));
     app.view = g;
     showCountdown();
-    renderer.draw(g, input, dt, { status: app.role === 'host' && app.unstable ? 'Connection unstable…' : '' });
+    const dim = !!ui.screen();
+    $('hud-btns').hidden = dim || g.over;
+    renderer.draw(g, input, dt, { hideHud: dim, status: app.role === 'host' && app.unstable ? 'Connection unstable…' : '' });
   } else if (app.running && app.role === 'guest') {
     if (app.countdown > 0) app.countdown -= dt;
     const v = app.interp.view(now);
@@ -586,7 +621,9 @@ function frame(nowMs) {
       $('btn-skip').hidden = !v.tut;
       app.view = v;
       showCountdown();
-      renderer.draw(v, input, dt, { status: app.unstable ? 'Connection unstable…' : '' });
+      const dim = !!ui.screen();
+      $('hud-btns').hidden = dim || v.phase === 'over' || v.phase === 'won';
+      renderer.draw(v, input, dt, { hideHud: dim, status: app.unstable ? 'Connection unstable…' : '' });
     } else {
       renderer.ctx.setTransform(1, 0, 0, 1, 0, 0);
       renderer.ctx.fillStyle = '#05070f'; renderer.ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -597,8 +634,11 @@ function frame(nowMs) {
   // drop countdown
   if (ui.screen() === 'drop') {
     const left = Math.max(0, app.dropDeadline - now);
-    ui.setText('drop-count', String(Math.ceil(left)));
-    if (left <= 0) $('drop-buttons').hidden = false;
+    if (left > 0) ui.setText('drop-count', String(Math.ceil(left)));
+    else {
+      ui.setText('drop-count', app.role === 'guest' ? "Still can't reach the host" : "They haven't come back yet");
+      $('btn-waitmore').hidden = false;
+    }
   }
 }
 

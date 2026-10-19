@@ -114,6 +114,7 @@ function overtimeMin(g) {
 
 function computeSpeedMul(g) {
   let m = g.assist ? g.cfg.assist.enemySpeed : 1;
+  if (!g.anyInput && g.wave <= 1) m *= g.cfg.player.idleGrace;
   if (g.mode === 'survival') {
     const S = g.cfg.survival;
     m *= S.speed * (1 + S.speedRamp * Math.max(0, g.wave - 1));
@@ -154,7 +155,8 @@ export function stepGame(g, inputs, dt = g.cfg.dt) {
     updateTutorial(g, dt);
     g.spawner.update(dt, edt);
     if (g.tut.finished) {
-      g.tut = null; g.gems.length = 0;
+      g.tut = null; g.gems.length = 0; g.capsules.length = 0;
+      for (const k of POWER_KINDS) g.power[k] = 0;
       g.events.push({ k: 'tutDone' });
       startWave(g, 1);
     }
@@ -208,10 +210,10 @@ function victory(g) {
   const cfg = g.cfg;
   g.score += cfg.score.lifeBonus * g.lives;
   g.over = true; g.won = true; g.phase = 'won';
-  const left = g.lives - (g.startLives - cfg.lives.survival); // assist bonus lives don't count toward stars
+  const hits = g.players[0].hits + g.players[1].hits;
   let stars = 1;
-  if (left >= cfg.stars.twoLives) stars = 2;
-  if (left >= cfg.stars.threeLives && g.score >= cfg.stars.threeScore) stars = 3;
+  if (hits <= cfg.stars.twoHits) stars = 2;
+  if (hits <= cfg.stars.threeHits && g.time <= cfg.stars.threeTime) stars = 3;
   if (g.checkpoint) stars = 1;
   g.stars = stars;
   g.events.push({ k: 'win', stars });
@@ -232,6 +234,7 @@ function movePlayers(g, inputs, dt) {
     const m = len(ix, iy);
     if (m > 1) { ix /= m; iy /= m; }
     p.ix = ix; p.iy = iy;
+    if (m > 0.2) g.anyInput = true;
     p.vx += (ix * P.maxSpeed - p.vx) * k;
     p.vy += (iy * P.maxSpeed - p.vy) * k;
   }

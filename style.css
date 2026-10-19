@@ -34,7 +34,7 @@ html, body {
   background: radial-gradient(ellipse at center, rgba(10, 13, 30, 0.55), rgba(5, 7, 15, 0.85));
 }
 .screen.on { display: flex; animation: fade 0.18s ease-out; }
-.screen.dim { background: rgba(5, 7, 15, 0.78); }
+.screen.dim { background: rgba(5, 7, 15, 0.9); }
 @keyframes fade { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: none; } }
 
 h2 { margin: 0; font-size: clamp(22px, 5.5vh, 40px); font-weight: 900; letter-spacing: 0.02em; }
@@ -74,6 +74,7 @@ h2 { margin: 0; font-size: clamp(22px, 5.5vh, 40px); font-weight: 900; letter-sp
 .card:disabled { opacity: 0.45; cursor: default; }
 .card-t { font-size: clamp(20px, 5vh, 28px); font-weight: 900; }
 .card-d { color: var(--muted); font-size: 15px; }
+.card-r { color: var(--muted); font-size: 13px; }
 .card-b { color: var(--tele); font-weight: 800; font-size: 15px; min-height: 1.2em; }
 
 .host-wrap { display: flex; gap: clamp(12px, 3vw, 32px); align-items: center; justify-content: center; flex-wrap: wrap; }
@@ -114,9 +115,9 @@ h2 { margin: 0; font-size: clamp(22px, 5.5vh, 40px); font-weight: 900; letter-sp
 
 #hud-btns { position: absolute; inset: 0; pointer-events: none; }
 .hud-btn { pointer-events: auto; position: absolute; top: calc(6px + var(--safe-t)); left: 50%; transform: translateX(-50%);
-  min-width: 48px; min-height: 40px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.22); background: rgba(10, 13, 30, 0.6);
+  min-width: 52px; min-height: 48px; border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.22); background: rgba(10, 13, 30, 0.6);
   color: #fff; font: 800 15px var(--font); cursor: pointer; touch-action: manipulation; }
-.hud-btn.skip { top: auto; left: auto; transform: none; right: calc(12px + var(--safe-r)); bottom: calc(12px + var(--safe-b)); padding: 0 14px; }
+.hud-btn.skip { left: auto; transform: none; right: calc(12px + var(--safe-r)); padding: 0 14px; }
 
 .rotate { position: absolute; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; pointer-events: auto; z-index: 10; font-size: 20px; font-weight: 800; }
 .rotate[hidden], .countdown[hidden], #hud-btns[hidden], .toast[hidden] { display: none; }

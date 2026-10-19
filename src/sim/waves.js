@@ -104,7 +104,8 @@ export function genEndlessWave(cfg, n, rng, overtimeMin = 0) {
   const E = cfg.endless, costs = cfg.enemies;
   const steps = [];
   const bossWave = n % E.bossEvery === 0;
-  let budget = endlessBudget(cfg, n, overtimeMin) * (bossWave ? 0.3 : 1);
+  const afterBoss = n > 1 && (n - 1) % E.bossEvery === 0;
+  let budget = endlessBudget(cfg, n, overtimeMin) * (bossWave ? 0.3 : afterBoss ? E.postBossBudget : 1);
   const cap = Math.round(endlessCap(cfg, n, overtimeMin));
   const [pa, pb, pmin] = E.pulse;
   const interval = Math.max(pmin, pa + pb * n);

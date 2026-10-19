@@ -40,6 +40,7 @@ export class Renderer {
     this.safe = { l: 0, r: 0, t: 0, b: 0 };
     this.showHint = 0;
     this.hatch = null;
+    this.shotPrev = new Map();
     this.resize();
   }
 
@@ -124,7 +125,7 @@ export class Renderer {
         P.ring(ev.x, ev.y, 110, '#ffffff', 0.35);
         this.flash = 0.18;
         this.shake.add(fx.trauma.hurt);
-        if (ev.k === 'hurtTut') F.add(ev.x, ev.y - 40, 'OUCH! That costs a life', '#ffffff', 22, 1.6, -30);
+        if (ev.k === 'hurtTut') F.add(ev.x, ev.y - 40, 'OUCH! In a real game that costs a life', '#ffffff', 22, 1.8, -30);
         else this.hurtPulse = 0.6;
         break;
       }
@@ -214,8 +215,9 @@ export class Renderer {
     // screen space
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (this.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${Math.min(0.35, this.flash * 2)})`; ctx.fillRect(0, 0, this.cw, this.ch); }
+    if (opts.attract) { ctx.fillStyle = 'rgba(5,7,15,0.55)'; ctx.fillRect(0, 0, this.cw, this.ch); return; }
+    if (opts.hideHud) return;
     if (input && !opts.hideSticks) this.drawSticks(ctx, input, view);
-    if (opts.attract) { ctx.fillStyle = 'rgba(5,7,15,0.35)'; ctx.fillRect(0, 0, this.cw, this.ch); return; }
     if (!D.nohud) this.drawHUD(ctx, view, opts);
     if (!D.nohud) this.drawBanner(ctx, view);
   }
@@ -396,10 +398,15 @@ export class Renderer {
           ctx.moveTo(-r * 0.2, r * 0.15); ctx.lineTo(0, r * 0.85); ctx.stroke(); ctx.restore();
           break;
         case 'spitter': {
+          // turret: round body, three stubby feet, a barrel pointing at its target, one big eye
           ctx.save(); ctx.translate(e.x, e.y);
-          ctx.beginPath(); ctx.moveTo(0, -r * 1.25); ctx.lineTo(r * 1.05, 0); ctx.lineTo(0, r * 1.25); ctx.lineTo(-r * 1.05, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
-          ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, r * 0.42, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = COLORS.enemyDark; ctx.beginPath(); ctx.arc(Math.cos(e.a) * r * 0.2, Math.sin(e.a) * r * 0.2, r * 0.2, 0, Math.PI * 2); ctx.fill();
+          for (let k2 = 0; k2 < 3; k2++) { const fa = k2 * 2.094 + Math.PI / 2; ctx.beginPath(); ctx.arc(Math.cos(fa) * r * 0.95, Math.sin(fa) * r * 0.95, r * 0.32, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+          ctx.save(); ctx.rotate(e.a);
+          ctx.beginPath(); ctx.rect(r * 0.4, -r * 0.3, r * 0.95, r * 0.6); ctx.fill(); ctx.stroke();
+          ctx.restore();
+          ctx.beginPath(); ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, r * 0.45, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = COLORS.enemyDark; ctx.beginPath(); ctx.arc(Math.cos(e.a) * r * 0.2, Math.sin(e.a) * r * 0.2, r * 0.22, 0, Math.PI * 2); ctx.fill();
           ctx.restore();
           break;
         }
@@ -508,9 +515,19 @@ export class Renderer {
     for (const s of view.shots) this.drawGlow(ctx, s.x, s.y, s.r * 3, COLORS.shot, 0.8);
     ctx.globalCompositeOperation = 'source-over';
     for (const s of view.shots) {
-      ctx.fillStyle = COLORS.shot; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+      // high-contrast projectile: white-hot core, dark ring, bright rim, short trail
+      const prev = this.shotPrev.get(s.id);
+      if (prev) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = s.r * 1.2; ctx.lineCap = 'round';
+        const dx = s.x - prev[0], dy = s.y - prev[1], l = Math.hypot(dx, dy) || 1;
+        ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - dx / l * s.r * 2.6, s.y - dy / l * s.r * 2.6); ctx.stroke();
+      }
+      this.shotPrev.set(s.id, [s.x, s.y]);
+      ctx.fillStyle = '#16040f'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r + 3, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = COLORS.shot; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 0.6, 0, Math.PI * 2); ctx.fill();
     }
+    if (this.shotPrev.size > 200) this.shotPrev.clear();
   }
 
   drawPortals(ctx, view) {
@@ -615,7 +632,7 @@ export class Renderer {
   }
 
   label(ctx, x, y, text, color, size) {
-    ctx.font = `800 ${size}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `800 ${size}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
     ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(5,7,15,0.85)'; ctx.strokeText(text, x, y);
     ctx.fillStyle = color; ctx.fillText(text, x, y);
   }
@@ -654,10 +671,12 @@ export class Renderer {
 
   drawHUD(ctx, view, opts) {
     const S = this.safe, pad = 12;
-    const L = S.l + pad, T = S.t + pad, Rr = this.cw - S.r - pad;
+    // on tall screens (tablets) keep the HUD just above the arena instead of up in the empty band
+    const arenaTop = (this.ch - view.cfg.arena.h * this.scale) / 2;
+    const L = S.l + pad, T = Math.max(S.t + pad, arenaTop - 52), Rr = this.cw - S.r - pad;
     const k = Math.max(0.75, Math.min(1.15, this.ch / 500));
     // lives
-    if (!view.tut) {
+    {
       for (let i = 0; i < view.maxLives; i++) {
         const x = L + 14 * k + i * 30 * k, y = T + 14 * k;
         const pulse = this.hurtPulse > 0 && i === view.lives ? 1 + this.hurtPulse : 1;
@@ -672,18 +691,23 @@ export class Renderer {
       const v = view.power[kind];
       if (v > 0) {
         this.powerIcon(ctx, kind, px + 10 * k, py, 12 * k);
-        ctx.font = `700 ${Math.round(12 * k)}px ${FONT}`; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left';
-        ctx.fillText(Math.ceil(v) + 's', px + 26 * k, py + 4);
-        px += 62 * k;
+        ctx.font = `800 ${Math.round(12 * k)}px ${FONT}`; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        const txt = `${POWER_LABEL[kind]} ${Math.ceil(v)}s`;
+        ctx.fillText(txt, px + 26 * k, py);
+        px += ctx.measureText(txt).width + 44 * k;
       }
     }
     // score + combo
     ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-    ctx.font = `800 ${Math.round(24 * k)}px ${FONT}`; ctx.fillStyle = '#ffffff';
-    ctx.fillText(String(view.score), Rr, T);
+    if (!view.tut) {
+      ctx.font = `700 ${Math.round(10 * k)}px ${FONT}`; ctx.fillStyle = 'rgba(220,226,255,0.65)';
+      ctx.fillText('SCORE', Rr, T - 2);
+      ctx.font = `800 ${Math.round(24 * k)}px ${FONT}`; ctx.fillStyle = '#ffffff';
+      ctx.fillText(String(view.score), Rr, T + 9 * k);
+    }
     if (view.combo >= 2) {
       ctx.font = `800 ${Math.round(16 * k)}px ${FONT}`; ctx.fillStyle = view.mult > 1 ? COLORS.tele : '#c8d0ff';
-      ctx.fillText(`${view.combo} combo${view.mult > 1 ? '  ×' + view.mult : ''}`, Rr, T + 28 * k);
+      ctx.fillText(`${view.combo} combo${view.mult > 1 ? '  ×' + view.mult : ''}`, Rr, T + 37 * k);
     }
     // wave label (top centre, beside the pause button)
     ctx.textAlign = 'center';

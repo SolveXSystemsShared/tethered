@@ -9,6 +9,7 @@ export const TUT_TEXT = {
   stretch: 'Now stretch the rope apart',
   sweep: 'Hit it with the rope!',
   gem: 'Grab the gem',
+  capsule: 'Power-up! Both stand in the ring together',
   danger: "Don't let them touch you!",
   wave: 'Sweep them all!',
   done: 'Ready!',
@@ -88,6 +89,13 @@ export function updateTutorial(g, dt) {
       break;
     case 'gem':
       if (tut.flags.gem) {
+        go(g, 'capsule');
+        g.spawnCapsule('shield');
+        g.capsules[g.capsules.length - 1].t = 9999;
+      }
+      break;
+    case 'capsule':
+      if (g.capsules.length === 0) {
         go(g, 'danger');
         const e = g.addEnemy('drifter', a.x < w / 2 ? w - 60 : 60, h / 2);
         e.tut = true; tut.enemyId = e.id;

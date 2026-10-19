@@ -1,0 +1,29 @@
+{
+  "issues": [
+    {"severity": "Major", "issue": "Game loop crashed every frame when no AudioContext existed (demo, guest joining by link without tapping): canvas froze, end screen not sent to the guest.", "fix": "All synth paths guard a missing AudioContext; every effect handler is wrapped so a cosmetic failure can never stop the simulation or rendering. Regression test added."},
+    {"severity": "Major", "issue": "If the host reloaded/closed, the guest waited on 'Reconnecting…' for a room that no longer existed.", "fix": "Both pages send a goodbye on page unload; the guest also treats repeated 'peer unavailable' from the broker as 'The host left the game' with a Main menu button. Tested with local and real PeerJS (incl. a silent host crash)."},
+    {"severity": "Major", "issue": "3 stars nearly unreachable and dependent on an opaque score bar.", "fix": "Stars are now kid-readable and skill-based: 2★ = clear taking 4 hits or fewer, 3★ = flawless clear (no hits) under 7:05. Rules shown on the Survival card and on the end screen ('You took N hits…'). Strong pairs get 3★ in ~7% of runs."},
+    {"severity": "Major", "issue": "Endless difficulty spiked right after the first boss.", "fix": "The wave after every boss is a breather (55% budget)."},
+    {"severity": "Major", "issue": "'Skip tutorial' sat in Player 2's thumb zone.", "fix": "Moved to the top bar beside Pause; 48 px tall buttons."},
+    {"severity": "Minor", "issue": "Tutorial said 'That costs a life' but didn't; lives hidden in tutorial.", "fix": "Text now 'In a real game that costs a life'; hearts shown during the tutorial."},
+    {"severity": "Minor", "issue": "Tutorial never taught Link capsules; active power-up chip had no name.", "fix": "New tutorial step: both orbs stand in a capsule ring. HUD chips show the power name and seconds left."},
+    {"severity": "Minor", "issue": "Spitter (diamond) resembled Player 2's diamond.", "fix": "Spitter redrawn as a round turret with feet, a barrel and an eye."},
+    {"severity": "Minor", "issue": "Enemy shots hard to see among pink enemies.", "fix": "Shots now have a white-hot core, dark ring, bright rim and a trail."},
+    {"severity": "Minor", "issue": "Spikes under text outlines (miter joins).", "fix": "Round line joins for all outlined text."},
+    {"severity": "Minor", "issue": "HUD and HUD buttons showed through dialogs.", "fix": "HUD and in-game buttons hidden under any dialog; overlays more opaque."},
+    {"severity": "Minor", "issue": "Endless end screen could say 'Best wave 0'.", "fix": "Best wave shown only when meaningful."},
+    {"severity": "Minor", "issue": "Wave 1 punished players who hadn't started moving.", "fix": "Until anyone moves, wave-1 enemies move at half speed; wave 1 also tightened (less idle time)."},
+    {"severity": "Minor", "issue": "Drop screens: 'Keep waiting' shown during the countdown, stale pause text, a lingering '0'.", "fix": "Only 'Main menu' during the countdown; after it, 'Keep waiting' appears and the 0 becomes a sentence. A guest closing the tab drops immediately (goodbye message)."},
+    {"severity": "Minor", "issue": "'How to play' dropped players straight into a Survival run.", "fix": "It now ends on a 'You've got it!' screen: Play Survival / Main menu."},
+    {"severity": "Minor", "issue": "No keyboard pause.", "fix": "Esc / P pause and resume."},
+    {"severity": "Minor", "issue": "Buttons under 48 px.", "fix": "In-game buttons 52×48 px, inside safe-area insets."},
+    {"severity": "Minor", "issue": "4:3 tablets letterbox the 2:1 arena; HUD far from the action.", "fix": "HUD now sits just above the arena on tall screens. The arena stays 2:1 on purpose so both phones in an online game see the same world."},
+    {"severity": "Minor", "issue": "Guest's view of the host orb occasionally stuttered.", "fix": "Snapshots 20→25 Hz and interpolation delay 100→120 ms."},
+    {"severity": "Polish", "issue": "Attract demo distracted behind the title text.", "fix": "Darker veil over the demo."},
+    {"severity": "Polish", "issue": "Score had no label; showed '0' during the tutorial.", "fix": "Small SCORE caption; score hidden during the tutorial."},
+    {"severity": "Polish", "issue": "Host link field cut off the code.", "fix": "Field scrolls to show the end of the link (the code)."},
+    {"severity": "Polish", "issue": "No settings in the pause menu.", "fix": "Settings button in Pause (shake applies immediately; Assist applies from the next game, labelled)."},
+    {"severity": "Polish", "issue": "Boss can feel short for expert teams (~20–35 s).", "fix": "Kept by design: average pairs need ~70 s and only clear 35% overall; lengthening it would push average pairs below the 30% target. Noted as a candidate for a future 'Hard' mode."}
+  ],
+  "rerun": "After the fixes the full simulation was rerun (1,200 runs). All targets still hold — see section 11 (those are the post-review numbers)."
+}

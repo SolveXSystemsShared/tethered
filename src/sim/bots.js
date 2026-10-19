@@ -258,6 +258,8 @@ export class Bot {
       tx = r.x; ty = r.y;
     } else if (tut.step === 'stretch') {
       tx = me.x + (me.x - mate.x); ty = me.y + (me.y - mate.y);
+    } else if (tut.step === 'capsule' && g.capsules.length) {
+      tx = g.capsules[0].x + (this.i ? 20 : -20); ty = g.capsules[0].y;
     } else if (tut.step === 'gem' && g.gems.length) {
       tx = g.gems[0].x; ty = g.gems[0].y;
     } else if (g.enemies.length) {

@@ -1,6 +1,6 @@
 # Tethered — Game Design (Plan)
 
-Status: living document. Numbers below are the *initial* plan values; the tuned values live in
+Status: this is the original plan. Numbers below are the *initial* plan values (several mechanics changed during simulation-driven tuning and review — see the Word design document, section 10, and docs/sim-results.md); the tuned values live in
 `src/config.js` (the single source of truth) and the final tuning is recorded in `docs/sim-results.md`.
 
 ## 1. Pillars

@@ -95,7 +95,7 @@ await test('tutorial: interactive steps complete (bot-driven) and lead into wave
     if (s.startsWith('none')) break;
     await sleep(400);
   }
-  const want = ['move', 'together', 'stretch', 'sweep', 'gem', 'danger', 'wave', 'done'];
+  const want = ['move', 'together', 'stretch', 'sweep', 'gem', 'capsule', 'danger', 'wave', 'done'];
   for (const w of want) assert(steps.has(w), `step ${w} seen (${[...steps]})`);
   assert(await game(p, () => window.__tethered.game.wave === 1 && window.__tethered.game.lives === window.__tethered.game.startLives), 'wave 1 with full lives');
   await ctx.close();
@@ -170,6 +170,56 @@ await test('portrait during play shows rotate prompt', async () => {
   await ctx.close();
 });
 
+await test('regression: no audio ever started (no tap) -> boss, victory/game over still run without errors', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 844, height: 390 } });
+  const page = await ctx.newPage();
+  const errs = []; page.on('pageerror', (e) => errs.push(e.message));
+  await page.goto(BASE + '?nosw&demo=strong&mode=survival');
+  await page.waitForFunction(() => window.__tethered?.game);
+  await page.evaluate(() => { const g = window.__tethered.game; g.lives = 99; g.wave = 9; g.enemies.length = 0; g.portals.length = 0; g.spawner.steps = []; g.spawner.groups = []; });
+  await page.waitForFunction(() => window.__tethered.game.boss, null, { timeout: 15000 });
+  const t = await page.evaluate(() => window.__tethered.game.tick); await sleep(1500);
+  assert(await page.evaluate(() => window.__tethered.game.tick) > t + 30, 'sim keeps running');
+  await page.evaluate(() => { const g = window.__tethered.game; g.lives = 1; g.players[0].inv = 0; g.hurtPlayer(0, 'x'); });
+  await page.waitForSelector('#scr-end.on', { timeout: 6000 });
+  assert(errs.length === 0, 'errors: ' + errs.slice(0, 3).join(' | '));
+  await ctx.close();
+});
+
+await test('regression: "How to play" ends with a Play / Menu choice; Esc pauses', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 640 } });
+  const p = await newPage(ctx);
+  await click(p, 'text=How to play');
+  await sleep(300);
+  await click(p, '#btn-skip');
+  await p.waitForSelector('#scr-tutdone.on', { timeout: 5000 });
+  await click(p, '[data-act=tut-play]');
+  await sleep(2000);
+  assert(await game(p, () => !window.__tethered.app.paused && window.__tethered.game.wave === 1), 'playing wave 1');
+  await p.keyboard.press('Escape');
+  assert(await visible(p, 'scr-pause'), 'Esc opens pause');
+  await p.keyboard.press('p');
+  await sleep(100);
+  assert(!(await visible(p, 'scr-pause')), 'P resumes');
+  await ctx.close();
+});
+
+await test('regression: host reloads -> guest is told the host left (not stuck reconnecting)', async () => {
+  const ctx = await browser.newContext(PHONE);
+  const host = await newPage(ctx, 'net=local');
+  await click(host, 'text=Play on two phones'); await click(host, 'text=Host a game');
+  await host.waitForFunction(() => /^[A-Z0-9]{5}$/.test(document.getElementById('room-code').textContent), null, { timeout: 15000 });
+  const guest = await ctx.newPage();
+  await guest.goto((await host.inputValue('#room-link')).replace('?', '?nosw&'));
+  await guest.waitForFunction(() => document.getElementById('scr-wait')?.classList.contains('on'), null, { timeout: 15000 });
+  await click(host, '[data-act=mode-endless]');
+  await guest.waitForFunction(() => window.__tethered.app.running, null, { timeout: 10000 });
+  await host.reload();
+  await guest.waitForFunction(() => document.getElementById('scr-msg').classList.contains('on'), null, { timeout: 30000 });
+  assert((await guest.textContent('#msg-title')).includes('host left'), 'host-left message');
+  await ctx.close();
+});
+
 async function onlineFlow(makePages, label) {
   const [host, guest] = await makePages();
   await click(host, 'text=Play on two phones');
@@ -178,6 +228,7 @@ async function onlineFlow(makePages, label) {
   const code = await host.textContent('#room-code');
   const link = await host.inputValue('#room-link');
   assert(link.includes('#join=' + code), 'link contains code');
+  await host.waitForSelector('#qr svg', { timeout: 10000 });
   assert(await host.locator('#qr svg').count() === 1, 'QR rendered');
   await guest.goto(link.replace('?', '?nosw&'));
   await guest.waitForFunction(() => document.getElementById('scr-wait')?.classList.contains('on'), null, { timeout: 25000 });
@@ -211,7 +262,7 @@ async function onlineFlow(makePages, label) {
   await guest.evaluate(() => { window.__tethered.app.session.close(); });
   await guest.close();
   await host.waitForSelector('#scr-drop.on', { timeout: 15000 });
-  await host.waitForSelector('#drop-buttons:not([hidden])', { timeout: 15000 });
+  await host.waitForSelector('#btn-waitmore:not([hidden])', { timeout: 15000 });
   assert(await host.isVisible('text=Keep waiting'), 'keep waiting offered');
   assert(host.errors.length === 0, 'host errors: ' + host.errors.join(' | '));
 }

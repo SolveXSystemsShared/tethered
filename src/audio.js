@@ -46,6 +46,7 @@ function env(g, t, a, peak, d) {
 }
 
 function tone(type, f0, f1, dur, peak = 0.3, attack = 0.004, bus = sfxBus, when = 0) {
+  if (!ctx || !bus) return;
   const t = ctx.currentTime + when;
   const o = ctx.createOscillator(), g = ctx.createGain();
   o.type = type; o.frequency.setValueAtTime(f0, t);
@@ -57,6 +58,7 @@ function tone(type, f0, f1, dur, peak = 0.3, attack = 0.004, bus = sfxBus, when 
 }
 
 function noise(dur, peak, filterType, f0, f1, when = 0, q = 1) {
+  if (!ctx) return;
   const t = ctx.currentTime + when;
   const s = ctx.createBufferSource(); s.buffer = noiseBuf;
   const f = ctx.createBiquadFilter(); f.type = filterType; f.Q.value = q;
@@ -67,7 +69,7 @@ function noise(dur, peak, filterType, f0, f1, when = 0, q = 1) {
 }
 
 function duck() {
-  if (!musicBus) return;
+  if (!ctx || !musicBus) return;
   const t = ctx.currentTime;
   musicBus.gain.cancelScheduledValues(t);
   musicBus.gain.setTargetAtTime(0.12, t, 0.02);
@@ -99,6 +101,7 @@ export const sfx = {
   },
   hurt() {
     if (!canPlay('hurt', 120)) return;
+    if (!ctx) return;
     duck();
     const t = ctx.currentTime;
     const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
@@ -128,12 +131,12 @@ export const sfx = {
   bossIn() { if (!canPlay('boss', 500)) return; duck(); tone('sawtooth', 55, 40, 1.6, 0.3, 0.2); noise(1.4, 0.2, 'lowpass', 300, 80); },
   bossTele() { if (!canPlay('btele', 300)) return; tone('sine', 200, 600, 0.9, 0.08, 0.1); },
   bossHit() { if (!canPlay('bhit', 90)) return; tone('square', 140, 90, 0.08, 0.12); noise(0.05, 0.12, 'bandpass', 1500, 900, 0, 4); },
-  bossPhase() { duck(); tone('sawtooth', 80, 30, 1.0, 0.35, 0.02); noise(0.8, 0.3, 'lowpass', 2000, 100); },
-  bossDie() { duck(); tone('sawtooth', 110, 20, 2.0, 0.4, 0.01); noise(1.6, 0.35, 'lowpass', 5000, 60); [0, 4, 7, 12].forEach((s, i) => tone('triangle', 392 * semis(s), 392 * semis(s), 0.5, 0.12, 0.01, sfxBus, 0.6 + i * 0.12)); },
+  bossPhase() { if (!canPlay('bphase', 300)) return; duck(); tone('sawtooth', 80, 30, 1.0, 0.35, 0.02); noise(0.8, 0.3, 'lowpass', 2000, 100); },
+  bossDie() { if (!canPlay('bdie', 300)) return; duck(); tone('sawtooth', 110, 20, 2.0, 0.4, 0.01); noise(1.6, 0.35, 'lowpass', 5000, 60); [0, 4, 7, 12].forEach((s, i) => tone('triangle', 392 * semis(s), 392 * semis(s), 0.5, 0.12, 0.01, sfxBus, 0.6 + i * 0.12)); },
   coreOpen() { if (!canPlay('core', 300)) return; tone('sine', 400, 800, 0.3, 0.12); tone('sine', 600, 1200, 0.3, 0.08, 0.004, sfxBus, 0.1); },
   beam() { if (!canPlay('beam', 300)) return; noise(1.8, 0.12, 'bandpass', 800, 1600, 0, 8); },
-  win() { [0, 4, 7, 12, 7, 12, 16, 19].forEach((s, i) => tone('triangle', 392 * semis(s), 392 * semis(s), 0.25, 0.14, 0.01, sfxBus, i * 0.13)); },
-  over() { [12, 7, 4, 0].forEach((s, i) => tone('triangle', 330 * semis(s), 330 * semis(s), 0.35, 0.13, 0.01, sfxBus, i * 0.2)); },
+  win() { if (!canPlay('win', 500)) return; [0, 4, 7, 12, 7, 12, 16, 19].forEach((s, i) => tone('triangle', 392 * semis(s), 392 * semis(s), 0.25, 0.14, 0.01, sfxBus, i * 0.13)); },
+  over() { if (!canPlay('over', 500)) return; [12, 7, 4, 0].forEach((s, i) => tone('triangle', 330 * semis(s), 330 * semis(s), 0.35, 0.13, 0.01, sfxBus, i * 0.2)); },
   ui() { if (!canPlay('ui', 40)) return; tone('sine', 880, 1100, 0.05, 0.08); },
   ring() { if (!canPlay('ring', 100)) return; tone('sine', 660, 990, 0.12, 0.1); },
   tick() { if (!canPlay('tick', 200)) return; tone('square', 1000, 1000, 0.04, 0.06); },

@@ -71,7 +71,7 @@ export class Floaters {
       const pop = t > 0.85 ? 1 + (t - 0.85) * 3 : 1;
       ctx.globalAlpha = Math.min(1, t * 2.5);
       ctx.font = `800 ${Math.round(f.size * pop)}px ${font}`;
-      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(5,7,15,0.85)';
+      ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(5,7,15,0.85)';
       ctx.strokeText(f.text, f.x, f.y);
       ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
     }

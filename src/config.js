@@ -14,6 +14,7 @@ export const CONFIG = {
     invuln: 1.4,
     knockRadius: 160,
     knockSpeed: 460,
+    idleGrace: 0.5,          // enemy speed factor in wave 1 until anyone has moved (players still finding their grip)
   },
 
   rope: {
@@ -87,7 +88,9 @@ export const CONFIG = {
     milestones: [10, 25, 50],
   },
 
-  stars: { twoLives: 3, threeLives: 5, threeScore: 23200 },
+  // Stars (Survival): 1 = clear, 2 = clear taking at most twoHits hits,
+  // 3 = flawless (no hits) and faster than threeTime seconds. Kid-readable and skill-based.
+  stars: { twoHits: 4, threeHits: 0, threeTime: 425 },
 
   waves: {
     breather: 3.5,
@@ -110,6 +113,7 @@ export const CONFIG = {
     unlock: { dasher: 2, splitter: 4, spitter: 5, brute: 7 },
     weights: { drifter: 5, dasher: 2.4, splitter: 1.4, spitter: 1.2, brute: 1.0 },
     bossEvery: 10,
+    postBossBudget: 0.55,            // the wave after a boss is a breather
     heartEvery: 2,
     capsuleEvery: 34,
     overtimeStart: 420,              // seconds of play before overtime pressure
@@ -129,9 +133,9 @@ export const CONFIG = {
     prefix: 'tethered-v1-',
     codeLength: 5,
     alphabet: 'ABCDEFGHJKMNPQRSTUVWXYZ23456789',
-    snapshotHz: 20,
+    snapshotHz: 25,
     inputHz: 30,
-    interpDelay: 0.1,
+    interpDelay: 0.12,
     heartbeat: 0.5,
     unstableAfter: 2,
     dropAfter: 4,
@@ -158,10 +162,10 @@ export const CONFIG = {
 export const SURVIVAL_WAVES = [
   { name: 'First Contact', steps: [
     { t: 0.5, n: 2, type: 'drifter', side: 'L', gap: 0.4 },
-    { t: 3.5, n: 2, type: 'drifter', side: 'R', gap: 0.4 },
-    { t: 3.5, n: 2, type: 'drifter', side: 'T', gap: 0.4 },
-    { t: 3.5, n: 2, type: 'drifter', side: 'B', gap: 0.4 },
-    { t: 3.0, n: 2, type: 'drifter', side: 'LR', gap: 0.3 },
+    { t: 2.5, n: 2, type: 'drifter', side: 'R', gap: 0.4 },
+    { t: 2.5, n: 2, type: 'drifter', side: 'T', gap: 0.4 },
+    { t: 2.5, n: 2, type: 'drifter', side: 'B', gap: 0.4 },
+    { t: 2.5, n: 2, type: 'drifter', side: 'LR', gap: 0.3 },
   ] },
   { name: 'Crowd Control', steps: [
     { t: 0.5, n: 4, type: 'drifter', side: 'LR', gap: 0.3 },

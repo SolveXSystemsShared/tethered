@@ -47,6 +47,7 @@
       <button class="card" data-act="mode-survival">
         <span class="card-t">Survival</span>
         <span class="card-d">10 waves, then the boss. Earn up to 3 stars.</span>
+        <span class="card-r" id="survival-rules"></span>
         <span class="card-b" id="best-survival"></span>
       </button>
       <button class="card" data-act="mode-endless">
@@ -117,7 +118,7 @@
     <div class="toggles">
       <label class="tgl"><input type="checkbox" id="set-sound"><span>Sound</span></label>
       <label class="tgl"><input type="checkbox" id="set-shake"><span>Screen shake</span></label>
-      <label class="tgl"><input type="checkbox" id="set-assist"><span>Assist mode <small>+2 lives, slower enemies</small></span></label>
+      <label class="tgl"><input type="checkbox" id="set-assist"><span>Assist mode <small>+2 lives, slower enemies (from the next game)</small></span></label>
     </div>
     <div class="row small"><button class="btn ghost" data-act="back">Back</button></div>
   </section>
@@ -132,6 +133,7 @@
       <button class="btn" data-act="quit" id="btn-quit">Main menu</button>
     </div>
     <div class="row small">
+      <button class="btn ghost" data-act="settings">Settings</button>
       <button class="btn ghost icon" data-act="mute" aria-label="Toggle sound" id="btn-mute2">🔊</button>
     </div>
   </section>
@@ -156,9 +158,19 @@
     <h2 id="drop-title">Partner disconnected</h2>
     <p class="sub" id="drop-sub">Waiting for them to come back…</p>
     <div class="count" id="drop-count">30</div>
-    <div class="row big" id="drop-buttons" hidden>
-      <button class="btn primary" data-act="waitmore">Keep waiting</button>
+    <div class="row big">
+      <button class="btn primary" data-act="waitmore" id="btn-waitmore" hidden>Keep waiting</button>
       <button class="btn" data-act="leave">Main menu</button>
+    </div>
+  </section>
+
+  <!-- TUTORIAL FINISHED (from "How to play") -->
+  <section id="scr-tutdone" class="screen dim">
+    <h2>You've got it!</h2>
+    <p class="sub">Sweep together, grab gems, stand in rings for power-ups — and don't get touched.</p>
+    <div class="row big">
+      <button class="btn primary" data-act="tut-play">Play Survival</button>
+      <button class="btn" data-act="quit">Main menu</button>
     </div>
   </section>
 

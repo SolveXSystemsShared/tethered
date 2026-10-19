@@ -64,11 +64,12 @@ export function fillEnd(stats, info) {
   const bits = [];
   if (info.newBestScore) bits.push('New best score!');
   else if (info.bestScore) bits.push(`Best ${info.bestScore}`);
-  if (stats.mode === 'endless') bits.push(info.newBestWave ? 'New best wave!' : `Best wave ${info.bestWave}`);
+  if (stats.mode === 'endless' && (info.newBestWave || info.bestWave > 0)) bits.push(info.newBestWave ? 'New best wave!' : `Best wave ${info.bestWave}`);
   $('end-best').textContent = bits.join(' · ');
   let next = '';
   if (stats.mode === 'survival' && won && stats.stars < 3 && !stats.checkpoint) {
-    next = stats.stars === 1 ? `2★: finish with ${info.twoLives}+ lives left` : `3★: ${info.threeLives}+ lives left and ${info.threeScore.toLocaleString()} points`;
+    const hits = stats.hits[0] + stats.hits[1];
+    next = stats.stars === 1 ? `You took ${hits} hits. 2★: clear taking ${info.twoHits} hits or fewer.` : `You took ${hits} hit${hits === 1 ? '' : 's'}. 3★: a flawless clear (no hits) in under ${info.threeTime}.`;
   } else if (stats.mode === 'survival' && !won) {
     next = stats.wave >= 10 ? 'So close! Try the Warden again from the checkpoint.' : `You reached wave ${stats.wave} of 10.`;
   }

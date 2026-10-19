@@ -5,7 +5,7 @@ const TYPES = ['drifter', 'mini', 'dasher', 'splitter', 'spitter', 'brute', 'nod
 const GEMS = ['shard', 'prism', 'heart'];
 const POWERS = ['mega', 'freeze', 'shield', 'nova'];
 const PHASES = ['start', 'tutorial', 'fight', 'clear', 'over', 'won'];
-const STEPS = ['move', 'together', 'stretch', 'sweep', 'gem', 'danger', 'wave', 'done'];
+const STEPS = ['move', 'together', 'stretch', 'sweep', 'gem', 'capsule', 'danger', 'wave', 'done'];
 const r1 = (v) => Math.round(v);
 const r10 = (v) => Math.round(v * 10);
 const r100 = (v) => Math.round(v * 100);

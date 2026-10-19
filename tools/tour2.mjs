@@ -1,0 +1,25 @@
+// Screenshots of the review fixes.
+import { chromium } from 'playwright';
+const out = process.argv[2];
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+const p = await ctx.newPage();
+const shot = (n) => p.screenshot({ path: `${out}/f-${n}.png` });
+await p.goto('http://localhost:8080/?nosw');
+await p.waitForTimeout(800); await shot('1-title');
+await p.click('text=Play on this device'); await p.waitForTimeout(300); await shot('2-mode');
+await p.click('[data-act=mode-survival]'); await p.waitForTimeout(1200); await shot('3-tut-start');
+await p.evaluate(() => { const g = window.__tethered.game; g.tut.step = 'gem'; g.tut.flags.gem = true; });
+await p.waitForTimeout(800); await shot('4-tut-capsule');
+await p.click('#btn-skip'); await p.waitForTimeout(400);
+await p.evaluate(() => { const g = window.__tethered.game; g.lives = 99; g.wave = 5; g.enemies.length = 0; g.portals.length = 0; g.spawner.steps = []; g.spawner.groups = []; g.power.mega = 6; g.power.freeze = 4; });
+await p.waitForTimeout(9000); await shot('5-spitters');
+await p.click('#btn-pause'); await p.waitForTimeout(300); await shot('6-pause');
+await p.click('[data-act=resume]');
+await p.evaluate(() => { const g = window.__tethered.game; g.wave = 10; g.enemies.length = 0; g.portals.length = 0; g.boss = null; g.spawner.steps = []; g.spawner.groups = []; g.players[0].hits = 2; });
+await p.waitForTimeout(7000); await shot('7-victory');
+const t = await b.newContext({ viewport: { width: 1024, height: 768 }, hasTouch: true });
+const q = await t.newPage();
+await q.goto('http://localhost:8080/?nosw&demo=average&mode=endless'); await q.waitForTimeout(4000);
+await q.screenshot({ path: `${out}/f-8-tablet.png` });
+await b.close();
