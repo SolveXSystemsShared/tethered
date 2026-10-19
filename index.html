@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0d1a">
+<meta name="description" content="Tethered — a 2-player co-op action game. Two orbs, one elastic rope: sweep it through enemies together.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tethered">
+<title>Tethered</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game" aria-label="Tethered game area"></canvas>
+<div id="safe-probe" aria-hidden="true"></div>
+
+<div id="ui">
+  <!-- TITLE -->
+  <section id="scr-title" class="screen">
+    <canvas id="logo" width="640" height="200" aria-hidden="true"></canvas>
+    <h1 class="sr">Tethered</h1>
+    <p class="tag">Two orbs. One rope. Cut through everything — together.</p>
+    <div class="row big">
+      <button class="btn primary" data-act="local"><span class="ico">⇄</span> Play on this device</button>
+      <button class="btn primary alt" data-act="online"><span class="ico">⇆</span> Play on two phones</button>
+    </div>
+    <div class="row small">
+      <button class="btn ghost" data-act="howto">How to play</button>
+      <button class="btn ghost" data-act="settings">Settings</button>
+      <button class="btn ghost icon" data-act="mute" aria-label="Toggle sound" id="btn-mute">🔊</button>
+      <button class="btn ghost icon" data-act="fullscreen" aria-label="Fullscreen" id="btn-fs">⛶</button>
+    </div>
+    <p class="best" id="title-best"></p>
+    <p class="install" id="install-hint" hidden></p>
+  </section>
+
+  <!-- MODE SELECT (same device, and host once connected) -->
+  <section id="scr-mode" class="screen">
+    <h2 id="mode-title">Choose a mode</h2>
+    <p class="sub" id="mode-sub"></p>
+    <div class="cards">
+      <button class="card" data-act="mode-survival">
+        <span class="card-t">Survival</span>
+        <span class="card-d">10 waves, then the boss. Earn up to 3 stars.</span>
+        <span class="card-b" id="best-survival"></span>
+      </button>
+      <button class="card" data-act="mode-endless">
+        <span class="card-t">Endless</span>
+        <span class="card-d">Waves never stop. How far can you go?</span>
+        <span class="card-b" id="best-endless"></span>
+      </button>
+    </div>
+    <div class="row small">
+      <button class="btn ghost" data-act="back" id="mode-back">Back</button>
+    </div>
+  </section>
+
+  <!-- ONLINE: HOST OR JOIN -->
+  <section id="scr-online" class="screen">
+    <h2>Play on two phones</h2>
+    <p class="sub">One phone hosts. The other joins by scanning the code.</p>
+    <div class="row big">
+      <button class="btn primary" data-act="host">Host a game</button>
+      <button class="btn primary alt" data-act="join">Join a game</button>
+    </div>
+    <p class="hint">Works best with both phones on the same Wi-Fi.</p>
+    <div class="row small"><button class="btn ghost" data-act="back">Back</button></div>
+  </section>
+
+  <!-- HOST LOBBY -->
+  <section id="scr-host" class="screen">
+    <div class="host-wrap">
+      <div class="qr" id="qr" aria-label="QR code to join"></div>
+      <div class="host-info">
+        <h2 id="host-title">Scan to join</h2>
+        <p class="sub">or open the link / type the code on the other phone</p>
+        <div class="code" id="room-code" aria-live="polite">·····</div>
+        <div class="link-row">
+          <input id="room-link" readonly aria-label="Join link">
+          <button class="btn small-btn" data-act="copy">Copy</button>
+          <button class="btn small-btn" data-act="share" id="btn-share" hidden>Share</button>
+        </div>
+        <p class="status" id="host-status">Starting…</p>
+      </div>
+    </div>
+    <div class="row small"><button class="btn ghost" data-act="leave">Cancel</button></div>
+  </section>
+
+  <!-- JOIN -->
+  <section id="scr-join" class="screen">
+    <h2>Join a game</h2>
+    <p class="sub">Type the code shown on the host's phone</p>
+    <form id="join-form" class="join-form" autocomplete="off">
+      <input id="join-code" inputmode="text" autocapitalize="characters" spellcheck="false" maxlength="7" placeholder="CODE" aria-label="Room code">
+      <button class="btn primary" type="submit">Join</button>
+    </form>
+    <p class="status" id="join-status"></p>
+    <div class="row small"><button class="btn ghost" data-act="back">Back</button></div>
+  </section>
+
+  <!-- GUEST WAITING -->
+  <section id="scr-wait" class="screen">
+    <h2 id="wait-title">Connected!</h2>
+    <p class="sub" id="wait-sub">Waiting for the host to pick a mode…</p>
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="row small"><button class="btn ghost" data-act="leave">Leave</button></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="scr-settings" class="screen">
+    <h2>Settings</h2>
+    <div class="toggles">
+      <label class="tgl"><input type="checkbox" id="set-sound"><span>Sound</span></label>
+      <label class="tgl"><input type="checkbox" id="set-shake"><span>Screen shake</span></label>
+      <label class="tgl"><input type="checkbox" id="set-assist"><span>Assist mode <small>+2 lives, slower enemies</small></span></label>
+    </div>
+    <div class="row small"><button class="btn ghost" data-act="back">Back</button></div>
+  </section>
+
+  <!-- PAUSE -->
+  <section id="scr-pause" class="screen dim">
+    <h2 id="pause-title">Paused</h2>
+    <p class="sub" id="pause-sub"></p>
+    <div class="row big">
+      <button class="btn primary" data-act="resume">Resume</button>
+      <button class="btn" data-act="restart" id="btn-restart">Restart</button>
+      <button class="btn" data-act="quit" id="btn-quit">Main menu</button>
+    </div>
+    <div class="row small">
+      <button class="btn ghost icon" data-act="mute" aria-label="Toggle sound" id="btn-mute2">🔊</button>
+    </div>
+  </section>
+
+  <!-- END (game over / victory) -->
+  <section id="scr-end" class="screen dim">
+    <h2 id="end-title">Game over</h2>
+    <div class="stars" id="end-stars" aria-label="Stars"></div>
+    <p class="score-line"><span id="end-score">0</span><small id="end-best"></small></p>
+    <p class="sub" id="end-next"></p>
+    <table class="stats" id="end-stats" aria-label="Team stats"></table>
+    <div class="row big" id="end-buttons">
+      <button class="btn primary" data-act="again">Play again</button>
+      <button class="btn" data-act="retryboss" id="btn-retryboss" hidden>Retry the Warden</button>
+      <button class="btn" data-act="quit">Main menu</button>
+    </div>
+    <p class="status" id="end-wait" hidden>Waiting for the host…</p>
+  </section>
+
+  <!-- CONNECTION DROP -->
+  <section id="scr-drop" class="screen dim">
+    <h2 id="drop-title">Partner disconnected</h2>
+    <p class="sub" id="drop-sub">Waiting for them to come back…</p>
+    <div class="count" id="drop-count">30</div>
+    <div class="row big" id="drop-buttons" hidden>
+      <button class="btn primary" data-act="waitmore">Keep waiting</button>
+      <button class="btn" data-act="leave">Main menu</button>
+    </div>
+  </section>
+
+  <!-- MESSAGE -->
+  <section id="scr-msg" class="screen dim">
+    <h2 id="msg-title"></h2>
+    <p class="sub" id="msg-sub"></p>
+    <div class="row big"><button class="btn primary" data-act="msg-ok">OK</button></div>
+  </section>
+
+  <!-- COUNTDOWN -->
+  <div id="countdown" class="countdown" hidden>3</div>
+
+  <!-- IN-GAME BUTTONS -->
+  <div id="hud-btns" hidden>
+    <button id="btn-pause" class="hud-btn" data-act="pause" aria-label="Pause">❚❚</button>
+    <button id="btn-skip" class="hud-btn skip" data-act="skip" hidden>Skip tutorial ›</button>
+  </div>
+
+  <div id="rotate" class="rotate" hidden>
+    <div class="phone" aria-hidden="true"></div>
+    <p>Turn your phone sideways</p>
+  </div>
+  <div id="toast" class="toast" hidden></div>
+</div>
+
+<noscript>Tethered needs JavaScript to run.</noscript>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

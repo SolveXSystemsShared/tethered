@@ -1,0 +1,17 @@
+{
+  "name": "Tethered",
+  "short_name": "Tethered",
+  "description": "A 2-player co-op action game: two orbs joined by an elastic rope. Sweep it through enemies together.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0d1a",
+  "theme_color": "#0a0d1a",
+  "categories": ["games"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

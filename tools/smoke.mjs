@@ -1,0 +1,23 @@
+// Quick smoke test: loads pages, collects console errors, takes screenshots.
+import { chromium } from 'playwright';
+const out = process.argv[2] || '.';
+const base = process.argv[3] || 'http://localhost:8080/';
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+const page = await ctx.newPage();
+const errors = [];
+page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errors.push(m.type() + ': ' + m.text()); });
+page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+await page.goto(base + '?nosw');
+await page.waitForTimeout(1500);
+await page.screenshot({ path: `${out}/01-title.png` });
+await page.goto(base + '?nosw&demo=average&mode=survival');
+await page.waitForTimeout(6000);
+await page.screenshot({ path: `${out}/02-demo.png` });
+await page.waitForTimeout(8000);
+await page.screenshot({ path: `${out}/03-demo.png` });
+console.log(errors.join("\n") || "no errors so far");
+const st = await page.evaluate(() => { const g = window.__tethered.game; return { wave: g.wave, score: g.score, lives: g.lives, enemies: g.enemies.length, fps: window.__tethered.app.fps }; });
+console.log(JSON.stringify(st));
+console.log(errors.join('\n') || 'no errors');
+await browser.close();
