@@ -1,6 +1,6 @@
 // Service worker: precache the whole app so same-device play works offline.
 // Bump VERSION on every deploy so clients pick up the new files.
-const VERSION = 'tethered-v1.0.0';
+const VERSION = 'tethered-v1.1.0';
 const ASSETS = [
   './', 'index.html', 'style.css', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png',
