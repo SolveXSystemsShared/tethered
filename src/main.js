@@ -459,7 +459,14 @@ function startGuest(code, token) {
 function guestMsg(m) {
   const now = performance.now() / 1000;
   switch (m.t) {
-    case 's': app.interp.push(m.d, now); break;
+    case 's': app.interp.push(m.d, now); app.snaps = (app.snaps || 0) + 1; break;
+    case 'diag': {
+      // support/diagnostics: the host can ask what this phone is doing
+      const l = app.session?.link;
+      app.session?.send({ t: 'diag', d: { running: app.running, paused: app.paused, view: !!app.view, buf: app.interp?.buf.length, snaps: app.snaps || 0, frames: app.frames || 0,
+        screen: ui.screen(), vis: document.visibilityState, rotate: app.rotateHold, fast: l?.fast ? l.fast.readyState : 'none', w: innerWidth, h: innerHeight, ua: navigator.userAgent } });
+      break;
+    }
     case 'ev': for (const e of m.l) app.inEvents.push(e); break;
     case 'welcome':
       if (m.state === 'lobby' && !app.running) ui.show('wait');
@@ -552,6 +559,7 @@ function checkRotate() {
 let last = performance.now();
 function frame(nowMs) {
   requestAnimationFrame(frame);
+  app.frames = (app.frames || 0) + 1;
   const dt = Math.min(0.1, (nowMs - last) / 1000);
   last = nowMs;
   trackFps(dt);
@@ -675,7 +683,10 @@ function trackFps(dt) {
   if (f.length === 120) {
     const avg = f.reduce((a, b) => a + b, 0) / f.length;
     app.fps = 1 / avg;
-    if (app.running && avg > 0.024 && !renderer.lowQuality) { renderer.lowQuality = true; renderer.resize(); f.length = 0; }
+    // Drop to low quality only when frames are slow AND uneven. A steady 30fps (iPhone Low Power
+    // Mode, some browsers) is a refresh cap, not the device struggling.
+    const s = [...f].sort((a, b) => a - b), spread = s[Math.floor(s.length * 0.9)] - s[Math.floor(s.length * 0.1)];
+    if (app.running && avg > 0.024 && spread > 0.006 && !renderer.lowQuality) { renderer.lowQuality = true; renderer.resize(); f.length = 0; }
   }
 }
 

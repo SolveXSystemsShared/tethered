@@ -2,7 +2,7 @@
 // override any path via applyOverrides() to explore tunings without editing code.
 
 export const CONFIG = {
-  version: '1.1.0',
+  version: '1.1.1',
   arena: { w: 1500, h: 750, spawnMargin: 50, safeSpawnDist: 160 },
   dt: 1 / 60,
 

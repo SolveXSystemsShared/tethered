@@ -1,6 +1,6 @@
 // End-to-end tests (Playwright). Run: node tests/e2e.mjs [--only name] [--peer] [--base URL]
 // Needs the dev server: node tools/serve.mjs 8080
-import { chromium } from 'playwright';
+import { chromium, firefox, webkit } from 'playwright';
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,8 +9,12 @@ const args = process.argv.slice(2);
 const BASE = args.includes('--base') ? args[args.indexOf('--base') + 1] : 'http://localhost:8080/';
 const ONLY = args.includes('--only') ? args[args.indexOf('--only') + 1] : null;
 const WITH_PEER = args.includes('--peer');
+const BROWSER = args.includes('--browser') ? args[args.indexOf('--browser') + 1] : 'chromium';
+const IS_CR = BROWSER === 'chromium';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const PHONE = { viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true };
+const PHONE = BROWSER === 'firefox'
+  ? { viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true } // Firefox has no isMobile emulation
+  : { viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true };
 
 const results = [];
 let browser;
@@ -32,6 +36,14 @@ const game = (page, fn) => page.evaluate(fn);
 
 // multi-touch via CDP: each finger {id, x0,y0,x1,y1}
 async function touchDrag(page, fingers, ms = 600) {
+  if (!IS_CR) {
+    // Firefox/WebKit: dispatch real touch-type PointerEvents on the canvas (same code path the game uses)
+    const at = (t) => fingers.map((f) => ({ id: f.id + 10, x: f.x0 + (f.x1 - f.x0) * t, y: f.y0 + (f.y1 - f.y0) * t }));
+    const fire = (type, pts) => page.evaluate(([type, pts]) => { const c = document.getElementById('game'); for (const q of pts) c.dispatchEvent(new PointerEvent(type, { pointerId: q.id, pointerType: 'touch', clientX: q.x, clientY: q.y, bubbles: true, cancelable: true, isPrimary: q.id === 11 })); }, [type, pts]);
+    await fire('pointerdown', at(0));
+    for (let i = 1; i <= 12; i++) { await fire('pointermove', at(i / 12)); await sleep(ms / 24); }
+    return { end: async () => fire('pointerup', at(1)) };
+  }
   const cdp = await page.context().newCDPSession(page);
   const pts = (t) => fingers.map((f) => ({ x: f.x0 + (f.x1 - f.x0) * t, y: f.y0 + (f.y1 - f.y0) * t, id: f.id, radiusX: 8, radiusY: 8, force: 1 }));
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pts(0) });
@@ -47,7 +59,11 @@ async function test(name, fn) {
   catch (e) { results.push([name, 'FAIL', Date.now() - t0, e.message]); console.log('FAIL', name, '-', e.message.split('\n')[0]); }
 }
 
-browser = await chromium.launch({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns', '--autoplay-policy=no-user-gesture-required'] });
+const launchers = { chromium, firefox, webkit };
+const launchOpts = IS_CR ? { args: ['--disable-features=WebRtcHideLocalIpsWithMdns', '--autoplay-policy=no-user-gesture-required'] }
+  : BROWSER === 'firefox' ? { firefoxUserPrefs: { 'media.peerconnection.ice.obfuscate_host_addresses': false, 'media.navigator.permission.disabled': true } } : {};
+browser = await launchers[BROWSER].launch(launchOpts);
+console.log('browser:', BROWSER, browser.version());
 
 await test('title screen loads without errors', async () => {
   const ctx = await browser.newContext(PHONE);
@@ -273,7 +289,25 @@ await test('online (local two-tab transport): host/QR/link join, play, drop + re
   await ctx.close();
 });
 
-if (WITH_PEER) {
+if (WITH_PEER && !IS_CR) {
+  // mixed pairs over real PeerJS: this engine as host with a Chromium guest, and the reverse
+  const cr = await chromium.launch({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] });
+  const crPhone = { viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true };
+  const guestPage = async (ctx) => { const g = await ctx.newPage(); g.errors = []; g.on('pageerror', (e) => g.errors.push(e.message)); return g; };
+  await test(`online (PeerJS): ${BROWSER} host + Chromium guest — play, drop + rejoin`, async () => {
+    const c1 = await browser.newContext(PHONE), c2 = await cr.newContext(crPhone);
+    await onlineFlow(async () => [await newPage(c1), await guestPage(c2)], BROWSER + '-host');
+    await c1.close(); await c2.close();
+  });
+  await test(`online (PeerJS): Chromium host + ${BROWSER} guest — play, drop + rejoin`, async () => {
+    const c1 = await cr.newContext(crPhone), c2 = await browser.newContext(PHONE);
+    await onlineFlow(async () => [await newPage(c1), await guestPage(c2)], BROWSER + '-guest');
+    await c1.close(); await c2.close();
+  });
+  await cr.close();
+}
+
+if (WITH_PEER && IS_CR) {
   await test('online (PeerJS/WebRTC, two browser contexts): join via link, play, drop + rejoin', async () => {
     const c1 = await browser.newContext(PHONE), c2 = await browser.newContext(PHONE);
     await onlineFlow(async () => [await newPage(c1), await (async () => { const g = await c2.newPage(); g.errors = []; g.on('pageerror', (e) => g.errors.push(e.message)); return g; })()], 'peer');
@@ -294,8 +328,8 @@ await test('performance: busy late wave holds ~60fps with 4x CPU throttling', as
   await p.evaluate(() => { const i = window.__tethered.input; let t = 0; setInterval(() => { t += 0.05; i.keys.clear(); if (Math.sin(t) > 0) i.keys.add('d'); else i.keys.add('a'); if (Math.cos(t * 1.3) > 0) i.keys.add('ArrowUp'); else i.keys.add('ArrowDown'); }, 50); });
   await p.waitForFunction(() => window.__tethered.game.wave === 15 && window.__tethered.game.enemies.length >= 10, null, { timeout: 30000 });
   await sleep(1000);
-  const cdp = await ctx.newCDPSession(p);
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  const cdp = IS_CR ? await ctx.newCDPSession(p) : null;
+  if (cdp) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   const fr = await p.evaluate(() => new Promise((res) => {
     const ts = []; let last = performance.now();
     const f = (t) => { ts.push(t - last); last = t; if (ts.length < 300) requestAnimationFrame(f); else res(ts); };
@@ -306,13 +340,21 @@ await test('performance: busy late wave holds ~60fps with 4x CPU throttling', as
     let t0 = performance.now(); for (let i = 0; i < N; i++) T.renderer.draw(g, T.input, 1 / 60, {}); const r = (performance.now() - t0) / N;
     return { render: r };
   });
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  if (cdp) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   const sorted = [...fr].sort((a, b) => a - b);
   const avg = fr.reduce((a, b) => a + b, 0) / fr.length;
   const p95 = sorted[Math.floor(0.95 * sorted.length)];
   const ents = await game(p, () => window.__tethered.game.enemies.length + window.__tethered.game.shots.length);
-  console.log(`      perf @4x CPU: avg frame ${avg.toFixed(1)}ms (${(1000 / avg).toFixed(0)}fps) p95 ${p95.toFixed(1)}ms; draw() ${cost.render.toFixed(1)}ms; ${ents} enemies+shots; lowQuality=${await game(p, () => window.__tethered.renderer.lowQuality)}`);
-  assert(avg < 18.5, 'average frame under 18.5ms');
+  console.log(`      perf ${IS_CR ? '@4x CPU' : '(no throttling available)'}: avg frame ${avg.toFixed(1)}ms (${(1000 / avg).toFixed(0)}fps) p95 ${p95.toFixed(1)}ms; draw() ${cost.render.toFixed(1)}ms; ${ents} enemies+shots; lowQuality=${await game(p, () => window.__tethered.renderer.lowQuality)}`);
+  if (IS_CR) assert(avg < 18.5, 'average frame under 18.5ms');
+  else {
+    // no CPU throttling outside Chromium, and Playwright's WebKit caps every page at 30fps:
+    // compare against an empty page in the same browser instead
+    const ep = await ctx.newPage(); await ep.setContent('<canvas></canvas>');
+    const base = await ep.evaluate(() => new Promise((res) => { const ts = []; let last = performance.now(); const f = (t) => { ts.push(t - last); last = t; if (ts.length < 120) requestAnimationFrame(f); else res(ts.reduce((a, b) => a + b, 0) / ts.length); }; requestAnimationFrame(f); }));
+    console.log(`      empty-page baseline in ${BROWSER}: ${base.toFixed(1)}ms`);
+    assert(avg < base * 1.1 + 1, 'game keeps up with the browser frame rate');
+  }
   await ctx.close();
 });
 
